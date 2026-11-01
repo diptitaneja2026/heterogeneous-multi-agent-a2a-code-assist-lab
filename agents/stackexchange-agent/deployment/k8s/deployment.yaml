@@ -1,0 +1,68 @@
+# Stack Exchange A2A agent - GKE Deployment + Service.
+#
+# The image and PUBLIC_URL are environment-specific:
+#   - set `image` to your Artifact Registry image
+#   - after the LoadBalancer gets an external IP, set PUBLIC_URL to
+#     http://<EXTERNAL_IP> and re-apply / rollout restart so the agent card
+#     advertises a reachable endpoint.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stackexchange-agent
+  labels:
+    app: stackexchange-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: stackexchange-agent
+  template:
+    metadata:
+      labels:
+        app: stackexchange-agent
+    spec:
+      containers:
+        - name: stackexchange-agent
+          image: us-central1-docker.pkg.dev/YOUR_PROJECT_ID/agents/stackexchange-agent:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            # Set to http://<LoadBalancer external IP> after the Service is up.
+            - name: PUBLIC_URL
+              value: "http://localhost:8080"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+          readinessProbe:
+            httpGet:
+              path: /.well-known/agent-card.json
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /.well-known/agent-card.json
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stackexchange-agent
+  labels:
+    app: stackexchange-agent
+spec:
+  type: LoadBalancer
+  selector:
+    app: stackexchange-agent
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

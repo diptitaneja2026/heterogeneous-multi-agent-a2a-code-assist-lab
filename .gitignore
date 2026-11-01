@@ -1,0 +1,21 @@
+# Environment files & credentials
+.env
+*.env
+!*.env.example
+
+# Python virtual environments & cache
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Terraform state & provider binaries
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+# OS & Editor files
+.DS_Store
+*.swp
