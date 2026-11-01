@@ -558,9 +558,24 @@ agents-cli deploy --project ${PROJECT_ID} --no-confirm-project --no-wait \
 
 agents-cli deploy --status
 
-# 6. Register code-assistant in Gemini Enterprise (after creating enterprise-app in Console)
+# 6. Test the Root Orchestrator End-to-End via A2A (Synthesizing All 6 Sources)
+agents-cli run \
+  --url "https://us-central1-aiplatform.googleapis.com/reasoningEngines/v1/projects/306082515579/locations/us-central1/reasoningEngines/1260368254774280192/api" \
+  --mode a2a \
+  "Have we seen a memory leak in a background worker before?"
+
+# 7. Register code-assistant in Gemini Enterprise (after creating enterprise-app in Console)
 agents-cli publish gemini-enterprise \
-  --gemini-enterprise-app-id "projects/${PROJECT_NUMBER}/locations/global/collections/default_collection/engines/enterprise-app" \
+  --gemini-app-id "projects/${PROJECT_NUMBER}/locations/global/collections/default_collection/engines/enterprise-app" \
   --display-name "Code Assist" \
   --description "Researches a production error across a bug database, the engineering handbook, Salesforce, GitHub, and Stack Exchange, and returns one cited fix."
 ```
+
+#### Verified End-to-End Multi-Agent Response (`code-assistant` over A2A)
+Running the A2A query above against the deployed `code-assistant` Reasoning Engine fanned out in parallel via `ParallelAgent` and synthesized citations from all 6 internal and external sources:
+- **`[Bug Database]` (`bq-agent` on GKE Autopilot)**: Cited `BUG-1051` (unbounded in-memory caches → LRU cache + TTL / Redis migration), `BUG-1016` (wrap background tasks in `try/except`), and `BUG-1036` (late acknowledgments + idempotent tasks).
+- **`[Engineering Handbook]` (`VertexAiSearchTool` Datastore `code-manuals-datastore`)**: Cited `BUG-1068` (`httpx.Timeout(5.0, connect=2.0, read=5.0)`), `BUG-1032` (Pub/Sub ack deadline + `FlowControl(max_messages=200)`), and `BUG-1045` (matching Kubernetes resource `requests` and `limits`).
+- **`[Official Google Docs]` (`Developer Knowledge MCP` + Skill `using-developer-knowledge-mcp`)**: Cited GKE `cgroup v1` vs `cgroup v2` invisible OOM kills (`ContainerDied` / `TaskOOM event` in Logs Explorer) and `kubernetes.io/container/memory/used_bytes`.
+- **`[GitHub]` (`github-agent` on Agent Runtime)**: Cited `jrallison/go-workers` connection/file-descriptor leak remediation and Python/Ruby/Node worker recycling.
+- **`[Stack Exchange]` (`stackexchange-agent` LangGraph on Cloud Run)**: Cited Celery `worker_max_tasks_per_child` / `worker_max_memory_per_child` and Ruby `sidekiq-worker-killer`.
+- **`[Salesforce]` (`salesforce-agent` on Cloud Run + Vertex AI Memory Bank)**: Cited GKE Deployment Runbook (`kubectl top pod <pod-name>` and container sizing).
